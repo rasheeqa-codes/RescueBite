@@ -4,6 +4,7 @@ import AddDonation from '../donations/AddDonation.jsx';
 import MyDonations from './MyDonations.jsx';
 import IncomingRequests from './IncomingRequests.jsx';
 import { useEffect, useState } from 'react';
+import { useToast } from '../../context/ToastContext.jsx';
 import API from '../../services/api.js';
 import {
   Leaf, LayoutDashboard, PlusCircle, Package, ClipboardList,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 
 function DonorDashboard({ onLogout }) {
+  const { showToast } = useToast();
   const [dashboardStats, setDashboardStats] = useState({
     totalDonations: 0,
     availableFood: 0,
@@ -139,18 +141,25 @@ const formattedDate = today
 
     const response = await API.post('/donations', formData);
 
-    alert(response.data.message || 'Food donation added successfully!');
+    showToast(
+  response.data.message || 'Food donation added successfully!',
+  'success'
+);
+
+    setActivePage('Overview');
+
     return true;
 
   } catch (error) {
-    alert(
-      error.response?.data?.message ||
-      'Failed to add donation. Please try again.'
-    );
+    showToast(
+  error.response?.data?.message ||
+  'Failed to add donation. Please try again.',
+  'error'
+);
+
     return false;
   }
 };
-
   const navigation = [
     { name: 'Overview', icon: LayoutDashboard },
     { name: 'Add Food Donation', icon: PlusCircle },

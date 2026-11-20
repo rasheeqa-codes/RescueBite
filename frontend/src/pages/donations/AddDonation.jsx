@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useState } from 'react';
 import MapPicker from '../../components/MapPicker.jsx';
 import {
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 
 function AddDonation({ onBack, onSubmit }) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     foodName: '',
     category: '',
@@ -50,7 +52,7 @@ const handleImageChange = (e) => {
   const files = Array.from(e.target.files);
 
   if (files.length > 5) {
-    alert('You can upload a maximum of 5 images.');
+    showToast('You can upload a maximum of 5 images.', 'warning');
     e.target.value = '';
     return;
   }
@@ -68,7 +70,10 @@ const handleImageChange = (e) => {
   );
 
   if (invalidFile) {
-    alert('Only JPG, PNG and WEBP images up to 5 MB each are allowed.');
+    showToast(
+  'Only JPG, PNG and WEBP images up to 5 MB each are allowed.',
+  'error'
+);
     e.target.value = '';
     return;
   }
@@ -85,41 +90,47 @@ const handleImageChange = (e) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const preparedTime = new Date(formData.preparedAt);
-    const deadline = new Date(formData.pickupDeadline);
+  const preparedTime = new Date(formData.preparedAt);
+  const deadline = new Date(formData.pickupDeadline);
 
-    if (deadline <= preparedTime) {
-      setMessage('Pickup deadline must be after preparation time.');
-      return;
-    }
-
-    if (preparedTime > new Date()) {
-      setMessage('Preparation time cannot be in the future.');
-      return;
-    }
-    if (
-  formData.pickupLatitude === '' ||
-  formData.pickupLongitude === ''
-) {
-  setMessage('Please select a pickup location on the map.');
-  return;
-}
-
-    if (onSubmit) {
-  const success = await onSubmit({
-    ...formData,
-    images: selectedImages
-  });
-
-  if (success) {
-    setMessage('Donation added successfully!');
-  } else {
-    setMessage('Failed to save donation. Please try again.');
+  if (deadline <= preparedTime) {
+    setMessage('Pickup deadline must be after preparation time.');
+    return;
   }
-}
-  };
+
+  if (preparedTime > new Date()) {
+    setMessage('Preparation time cannot be in the future.');
+    return;
+  }
+
+  if (
+    formData.pickupLatitude === '' ||
+    formData.pickupLongitude === ''
+  ) {
+    setMessage('Please select a pickup location on the map.');
+    return;
+  }
+
+  if (onSubmit) {
+    try {
+      const success = await onSubmit({
+        ...formData,
+        images: selectedImages
+      });
+
+      if (success) {
+        onBack();
+      } else {
+        setMessage('Failed to save donation. Please try again.');
+      }
+    } catch (error) {
+      console.error('Donation submission error:', error);
+      setMessage('Failed to save donation. Please try again.');
+    }
+  }
+};
 
   return (
     <div className="add-donation-page">
@@ -285,21 +296,22 @@ const handleImageChange = (e) => {
             <p>Where should the NGO collect the donation?</p>
           </div>
         </div>
+        
+
         <div className="form-group full-width">
+  <label>Select Pickup Location on Map *</label>
+  <div className="form-group full-width">
   <label>Pickup Address *</label>
 
   <textarea
     name="address"
     value={formData.address}
     onChange={handleChange}
-    placeholder="Enter the complete food collection address..."
+    placeholder="Enter the complete pickup address..."
     rows="2"
     required
   />
 </div>
-
-        <div className="form-group full-width">
-  <label>Select Pickup Location on Map *</label>
   <p>Click on the map to mark where the NGO should collect the food.</p>
 
   <MapPicker

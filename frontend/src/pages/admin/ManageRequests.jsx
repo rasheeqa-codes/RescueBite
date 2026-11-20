@@ -1,117 +1,168 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
 import {
-  Search, Filter, Eye, X, ClipboardList,
-  CheckCircle2, XCircle, Clock, PackageCheck
+  Search,
+  Filter,
+  Eye,
+  X,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  PackageCheck,
+  MapPin
 } from 'lucide-react';
 
+import API from '../../services/api';
+
 function ManageRequests() {
-  const [requests, setRequests] = useState([
-    {
-      id: 'REQ-1001',
-      food: 'Vegetable Rice',
-      ngo: 'Helping Hands Foundation',
-      donor: 'Green Leaf Restaurant',
-      quantity: '15 servings',
-      date: '18 Nov 2026',
-      status: 'Pending',
-      location: 'RS Puram, Coimbatore',
-      phone: '9876543210',
-      notes: 'Required for evening food distribution.'
-    },
-    {
-      id: 'REQ-1002',
-      food: 'Fresh Apples',
-      ngo: 'Hope Trust',
-      donor: 'Fresh Mart',
-      quantity: '5 kg',
-      date: '17 Nov 2026',
-      status: 'Approved',
-      location: 'Gandhipuram, Coimbatore',
-      phone: '9876543211',
-      notes: 'For children at our care centre.'
-    },
-    {
-      id: 'REQ-1003',
-      food: 'Chapati and Dal',
-      ngo: 'Care and Share NGO',
-      donor: 'Annapoorna Hotel',
-      quantity: '25 servings',
-      date: '16 Nov 2026',
-      status: 'Collected',
-      location: 'Peelamedu, Coimbatore',
-      phone: '9876543212',
-      notes: 'Food collected successfully.'
-    },
-    {
-      id: 'REQ-1004',
-      food: 'Bread Packets',
-      ngo: 'Helping Hearts',
-      donor: 'Daily Bake Bakery',
-      quantity: '20 packets',
-      date: '15 Nov 2026',
-      status: 'Rejected',
-      location: 'Singanallur, Coimbatore',
-      phone: '9876543213',
-      notes: 'Request could not be fulfilled.'
-    },
-    {
-      id: 'REQ-1005',
-      food: 'Fresh Vegetables',
-      ngo: 'Hope Trust',
-      donor: 'Organic Farm',
-      quantity: '8 kg',
-      date: '18 Nov 2026',
-      status: 'Pending',
-      location: 'Saibaba Colony, Coimbatore',
-      phone: '9876543214',
-      notes: 'Needed for community kitchen.'
-    }
-  ]);
+  const [requests, setRequests] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const updateStatus = (id, newStatus) => {
-    setRequests(prev =>
-      prev.map(request =>
-        request.id === id
-          ? { ...request, status: newStatus }
-          : request
-      )
-    );
+  // Fetch actual requests from MongoDB
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-    if (selectedRequest?.id === id) {
-      setSelectedRequest(prev => ({ ...prev, status: newStatus }));
-    }
+        const response = await API.get('/admin/requests');
+
+        if (response.data.success) {
+          setRequests(response.data.requests || []);
+        } else {
+          setError('Unable to load requests.');
+        }
+
+      } catch (err) {
+        console.error('Error fetching requests:', err);
+
+        setError(
+          err.response?.data?.message ||
+          'Unable to load requests. Please try again.'
+        );
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequests();
+  }, []);
+
+  // Generate readable request ID
+  const getRequestId = (id) => {
+    if (!id) return 'N/A';
+
+    return `REQ-${id.slice(-6).toUpperCase()}`;
   };
 
-  const filteredRequests = requests.filter(request => {
+  // Get food name
+  const getFoodName = (request) => {
+    return request.donation?.foodName || 'Food information unavailable';
+  };
+
+  // Get NGO name
+  const getNGOName = (request) => {
+    return (
+      request.ngo?.organizationName ||
+      request.ngo?.fullName ||
+      'NGO information unavailable'
+    );
+  };
+
+  // Get donor name
+  const getDonorName = (request) => {
+    return (
+      request.donor?.organizationName ||
+      request.donor?.fullName ||
+      'Donor information unavailable'
+    );
+  };
+
+  // Get requested quantity
+  const getQuantity = (request) => {
+    const quantity = request.requestedQuantity;
+    const unit = request.donation?.unit || '';
+
+    if (quantity === undefined || quantity === null) {
+      return 'N/A';
+    }
+
+    return `${quantity} ${unit}`.trim();
+  };
+
+  // Format request date
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Search and status filtering
+  const filteredRequests = requests.filter((request) => {
+    const search = searchTerm.toLowerCase();
+
     const matchesSearch =
-      request.food.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.ngo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.id.toLowerCase().includes(searchTerm.toLowerCase());
+      getFoodName(request).toLowerCase().includes(search) ||
+      getNGOName(request).toLowerCase().includes(search) ||
+      getDonorName(request).toLowerCase().includes(search) ||
+      getRequestId(request._id).toLowerCase().includes(search);
 
     const matchesStatus =
-      statusFilter === 'All' || request.status === statusFilter;
+      statusFilter === 'All' ||
+      request.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
-  const pendingCount = requests.filter(r => r.status === 'Pending').length;
-  const approvedCount = requests.filter(r => r.status === 'Approved').length;
-  const collectedCount = requests.filter(r => r.status === 'Collected').length;
-  const rejectedCount = requests.filter(r => r.status === 'Rejected').length;
+  // Statistics
+  const pendingCount = requests.filter(
+    (r) => r.status === 'Pending'
+  ).length;
+
+  const approvedCount = requests.filter(
+    (r) => r.status === 'Approved'
+  ).length;
+
+  const collectedCount = requests.filter(
+    (r) => r.status === 'Collected'
+  ).length;
+
+  const rejectedCount = requests.filter(
+    (r) => r.status === 'Rejected'
+  ).length;
+
+  const cancelledCount = requests.filter(
+    (r) => r.status === 'Cancelled'
+  ).length;
 
   return (
     <div className="manage-requests-page">
 
+      {/* Page Heading */}
+
       <div className="admin-page-heading">
         <div>
           <h2>Manage Requests</h2>
-          <p>Monitor and manage food requests submitted by NGOs.</p>
+          <p>
+            Monitor food requests submitted by NGOs.
+          </p>
         </div>
       </div>
+
+      {/* Statistics */}
 
       <div className="admin-stats-grid">
 
@@ -119,6 +170,7 @@ function ManageRequests() {
           <div className="admin-stat-icon blue">
             <ClipboardList size={22} />
           </div>
+
           <div>
             <p>Total Requests</p>
             <h3>{requests.length}</h3>
@@ -129,6 +181,7 @@ function ManageRequests() {
           <div className="admin-stat-icon orange">
             <Clock size={22} />
           </div>
+
           <div>
             <p>Pending</p>
             <h3>{pendingCount}</h3>
@@ -139,6 +192,7 @@ function ManageRequests() {
           <div className="admin-stat-icon green">
             <CheckCircle2 size={22} />
           </div>
+
           <div>
             <p>Approved</p>
             <h3>{approvedCount}</h3>
@@ -149,6 +203,7 @@ function ManageRequests() {
           <div className="admin-stat-icon purple">
             <PackageCheck size={22} />
           </div>
+
           <div>
             <p>Collected</p>
             <h3>{collectedCount}</h3>
@@ -157,203 +212,356 @@ function ManageRequests() {
 
       </div>
 
+      {/* Requests Table */}
+
       <div className="admin-table-card">
 
         <div className="admin-table-toolbar">
 
           <div className="admin-search-box">
             <Search size={18} />
+
             <input
               type="text"
-              placeholder="Search food, NGO or request ID..."
+              placeholder="Search food, NGO, donor or request ID..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           <div className="admin-filter-box">
             <Filter size={17} />
+
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
-              <option value="Collected">Collected</option>
               <option value="Rejected">Rejected</option>
+              <option value="Collected">Collected</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
 
         </div>
 
         <div className="admin-table-wrapper">
-          <table className="admin-data-table">
-            <thead>
-              <tr>
-                <th>Request ID</th>
-                <th>Food Item</th>
-                <th>NGO</th>
-                <th>Quantity</th>
-                <th>Request Date</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
 
-            <tbody>
-              {filteredRequests.map(request => (
-                <tr key={request.id}>
-                  <td className="admin-id-cell">{request.id}</td>
-                  <td className="admin-name-cell">{request.food}</td>
-                  <td>{request.ngo}</td>
-                  <td>{request.quantity}</td>
-                  <td>{request.date}</td>
-                  <td>
-                    <span className={`admin-status-badge ${request.status.toLowerCase()}`}>
-                      {request.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="admin-view-btn"
-                      onClick={() => setSelectedRequest(request)}
-                    >
-                      <Eye size={16} />
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {loading ? (
 
-          {filteredRequests.length === 0 && (
             <div className="admin-empty-state">
-              <ClipboardList size={35} />
-              <h3>No requests found</h3>
-              <p>Try changing your search or status filter.</p>
+              <Clock size={35} />
+              <h3>Loading requests...</h3>
+              <p>Please wait while we fetch the records.</p>
             </div>
+
+          ) : error ? (
+
+            <div className="admin-empty-state">
+              <XCircle size={35} />
+              <h3>Unable to load requests</h3>
+              <p>{error}</p>
+            </div>
+
+          ) : (
+
+            <>
+              <table className="admin-data-table">
+
+                <thead>
+                  <tr>
+                    <th>Request ID</th>
+                    <th>Food Item</th>
+                    <th>NGO</th>
+                    <th>Quantity</th>
+                    <th>Request Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+
+                  {filteredRequests.map((request) => (
+
+                    <tr key={request._id}>
+
+                      <td className="admin-id-cell">
+                        {getRequestId(request._id)}
+                      </td>
+
+                      <td className="admin-name-cell">
+                        {getFoodName(request)}
+                      </td>
+
+                      <td>
+                        {getNGOName(request)}
+                      </td>
+
+                      <td>
+                        {getQuantity(request)}
+                      </td>
+
+                      <td>
+                        {formatDate(request.createdAt)}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`admin-status-badge ${
+                            (request.status || 'unknown')
+                              .toLowerCase()
+                              .replace(/\s+/g, '-')
+                          }`}
+                        >
+                          {request.status || 'Unknown'}
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          className="admin-view-btn"
+                          onClick={() => setSelectedRequest(request)}
+                        >
+                          <Eye size={16} />
+                          View
+                        </button>
+                      </td>
+
+                    </tr>
+
+                  ))}
+
+                </tbody>
+
+              </table>
+
+              {filteredRequests.length === 0 && (
+
+                <div className="admin-empty-state">
+                  <ClipboardList size={35} />
+
+                  <h3>No requests found</h3>
+
+                  <p>
+                    Try changing your search or status filter.
+                  </p>
+                </div>
+
+              )}
+
+            </>
+
           )}
+
         </div>
 
       </div>
 
-      <div className="admin-request-summary">
-        <span>Rejected Requests</span>
-        <strong>{rejectedCount}</strong>
+      {/* Request Summary */}
+
+      {!loading && !error && (
+
+        <div className="admin-request-summary">
+          <span>
+            Rejected: {rejectedCount} | Cancelled: {cancelledCount}
+          </span>
+
+          <strong>
+            {rejectedCount + cancelledCount}
+          </strong>
+        </div>
+
+      )}
+
+      {/* Request Details Modal */}
+
+      {/* Request Details Modal */}
+
+{selectedRequest && (
+  <div
+    className="admin-modal-overlay"
+    onClick={() => setSelectedRequest(null)}
+  >
+    <div
+      className="admin-details-modal request-details-redesigned"
+      onClick={(e) => e.stopPropagation()}
+    >
+
+      {/* Header */}
+      <div className="request-details-header">
+        <div className="request-details-heading">
+          <span className="request-details-label">REQUEST DETAILS</span>
+          <h3>{getRequestId(selectedRequest._id)}</h3>
+          <p>Food request information and participants</p>
+        </div>
+
+        <button
+          className="request-details-close-icon"
+          onClick={() => setSelectedRequest(null)}
+        >
+          <X size={20} />
+        </button>
       </div>
 
-      {selectedRequest && (
-        <div className="admin-modal-overlay">
-          <div className="admin-details-modal">
+      {/* Food Hero */}
+      <div className="request-food-hero">
+        <div className="request-food-icon">
+          <ClipboardList size={25} />
+        </div>
 
-            <div className="admin-modal-header">
-              <div>
-                <h3>Request Details</h3>
-                <p>{selectedRequest.id}</p>
+        <div className="request-food-title">
+          <span>REQUESTED FOOD</span>
+          <h2>{getFoodName(selectedRequest)}</h2>
+        </div>
+
+        <span
+          className={`admin-status-badge ${
+            (selectedRequest.status || 'unknown')
+              .toLowerCase()
+              .replace(/\s+/g, '-')
+        }`}
+        >
+          {selectedRequest.status || 'Unknown'}
+        </span>
+      </div>
+
+      {/* Food Information */}
+      <div className="request-details-section">
+
+        <h4 className="request-section-title">Food Information</h4>
+
+        <div className="request-info-grid">
+
+          <div className="request-info-card">
+            <span>Requested Quantity</span>
+            <strong>{getQuantity(selectedRequest)}</strong>
+          </div>
+
+          <div className="request-info-card">
+            <span>Food Category</span>
+            <strong>
+              {selectedRequest.donation?.category || 'Not provided'}
+            </strong>
+          </div>
+
+          <div className="request-info-card request-date-card">
+            <span>Request Date</span>
+            <strong>{formatDate(selectedRequest.createdAt)}</strong>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Participants */}
+      <div className="request-details-section">
+
+        <h4 className="request-section-title">Participants</h4>
+
+        <div className="request-participant-grid">
+
+          {/* NGO */}
+          <div className="request-participant-card">
+
+            <div className="request-participant-top">
+              <div className="request-participant-avatar ngo-avatar">
+                NGO
               </div>
-              <button onClick={() => setSelectedRequest(null)}>
-                <X size={21} />
-              </button>
+
+              <span className="request-participant-role">
+                RECEIVER
+              </span>
             </div>
 
-            <div className="admin-modal-content">
+            <h3>{getNGOName(selectedRequest)}</h3>
 
-              <div className="admin-detail-row">
-                <span>Food Item</span>
-                <strong>{selectedRequest.food}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>NGO Name</span>
-                <strong>{selectedRequest.ngo}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Food Donor</span>
-                <strong>{selectedRequest.donor}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Requested Quantity</span>
-                <strong>{selectedRequest.quantity}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Request Date</span>
-                <strong>{selectedRequest.date}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Contact Number</span>
-                <strong>{selectedRequest.phone}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Location</span>
-                <strong>{selectedRequest.location}</strong>
-              </div>
-
-              <div className="admin-detail-row">
-                <span>Current Status</span>
-                <strong>{selectedRequest.status}</strong>
-              </div>
-
-              <div className="admin-detail-notes">
-                <span>Additional Notes</span>
-                <p>{selectedRequest.notes}</p>
-              </div>
-
-            </div>
-
-            <div className="admin-modal-actions">
-
-              {selectedRequest.status === 'Pending' && (
-                <>
-                  <button
-                    className="admin-approve-btn"
-                    onClick={() => updateStatus(selectedRequest.id, 'Approved')}
-                  >
-                    <CheckCircle2 size={17} />
-                    Approve
-                  </button>
-
-                  <button
-                    className="admin-reject-btn"
-                    onClick={() => updateStatus(selectedRequest.id, 'Rejected')}
-                  >
-                    <XCircle size={17} />
-                    Reject
-                  </button>
-                </>
-              )}
-
-              {selectedRequest.status === 'Approved' && (
-                <button
-                  className="admin-approve-btn"
-                  onClick={() => updateStatus(selectedRequest.id, 'Collected')}
-                >
-                  <PackageCheck size={17} />
-                  Mark as Collected
-                </button>
-              )}
-
-              <button
-                className="admin-cancel-btn"
-                onClick={() => setSelectedRequest(null)}
-              >
-                Close
-              </button>
-
+            <div className="request-contact-row">
+              <span>Contact Number</span>
+              <strong>
+                {selectedRequest.ngo?.phone || 'Not provided'}
+              </strong>
             </div>
 
           </div>
-        </div>
-      )}
 
+          {/* Donor */}
+          <div className="request-participant-card">
+
+            <div className="request-participant-top">
+              <div className="request-participant-avatar donor-avatar">
+                DONOR
+              </div>
+
+              <span className="request-participant-role">
+                FOOD PROVIDER
+              </span>
+            </div>
+
+            <h3>{getDonorName(selectedRequest)}</h3>
+
+            <div className="request-contact-row">
+              <span>Contact Number</span>
+              <strong>
+                {selectedRequest.donor?.phone || 'Not provided'}
+              </strong>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      {/* Location */}
+      <div className="request-details-section">
+
+        <h4 className="request-section-title">Pickup Location</h4>
+
+        <div className="request-location-card">
+          <div className="request-location-icon">
+            <MapPin size={20} />
+          </div>
+
+          <div>
+            <span>Food pickup address</span>
+            <strong>
+              {selectedRequest.donation?.address || 'Location not provided'}
+            </strong>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Notes */}
+      <div className="request-details-section">
+
+        <h4 className="request-section-title">Additional Notes</h4>
+
+        <div className="request-notes-card">
+          {selectedRequest.donation?.notes || 'No additional notes provided.'}
+        </div>
+
+      </div>
+
+      {/* Footer */}
+      <div className="request-details-footer">
+
+        <button
+          className="request-details-close-button"
+          onClick={() => setSelectedRequest(null)}
+        >
+          Close
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
     </div>
   );
 }
+
 
 export default ManageRequests;

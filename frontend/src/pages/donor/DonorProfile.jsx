@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useState, useEffect } from 'react';
 import API from '../../services/api.js';
 import {
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 function DonorProfile({ onSave }) {
+  const { showToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -44,10 +46,11 @@ useEffect(() => {
 
     } catch (error) {
       console.error('Failed to fetch donor profile:', error);
-      alert(
-        error.response?.data?.message ||
-        'Unable to load your profile.'
-      );
+      showToast(
+  error.response?.data?.message ||
+  'Unable to load your profile.',
+  'error'
+);
     } finally {
       setLoading(false);
     }
@@ -87,7 +90,7 @@ useEffect(() => {
     setEditedProfile(updatedProfile);
     setIsEditing(false);
 
-    alert('Profile updated successfully.');
+    showToast('Profile updated successfully.', 'success');
     if (onSave) {
   onSave();
 }
@@ -95,10 +98,11 @@ useEffect(() => {
   } catch (error) {
     console.error('Failed to update profile:', error);
 
-    alert(
-      error.response?.data?.message ||
-      'Unable to update your profile.'
-    );
+    showToast(
+  error.response?.data?.message ||
+  'Unable to update your profile.',
+  'error'
+);
   }
 };
 

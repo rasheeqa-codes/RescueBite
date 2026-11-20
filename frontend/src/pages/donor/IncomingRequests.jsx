@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useState, useEffect } from 'react';
 import API from '../../services/api.js';
 import {
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 
 function IncomingRequests() {
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] = useState('All');
 const [selectedRequest, setSelectedRequest] = useState(null);
@@ -100,15 +102,19 @@ useEffect(() => {
         : previous
     );
 
-    alert(response.data.message || 'Request updated successfully!');
+    showToast(
+  response.data.message || 'Request updated successfully!',
+  'success'
+);
 
   } catch (error) {
     console.error('Update Request Error:', error);
 
-    alert(
-      error.response?.data?.message ||
-      'Unable to update request status.'
-    );
+    showToast(
+  error.response?.data?.message ||
+  'Unable to update request status.',
+  'error'
+);
   }
 };
   return (

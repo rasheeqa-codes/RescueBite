@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: ''
     },
+    
     // NGO organisation location
 organizationAddress: {
   type: String,

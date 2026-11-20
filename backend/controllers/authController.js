@@ -200,6 +200,9 @@ const updateProfile = async (req, res) => {
     if (organizationName !== undefined) {
       user.organizationName = organizationName.trim();
     }
+    if (organizationAddress !== undefined) {
+  user.organizationAddress = organizationAddress.trim();
+}
 
    if (registrationNumber !== undefined) {
   user.registrationNumber = registrationNumber.trim();

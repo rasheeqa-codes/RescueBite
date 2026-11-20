@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useEffect, useState } from 'react';
 import API from '../../services/api.js';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 function BrowseFood() {
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [location, setLocation] = useState('');
@@ -73,33 +75,37 @@ function BrowseFood() {
 
   // Convert database donations into display values
   const getFoodDetails = (food) => ({
-    id: food._id,
-    name: food.foodName,
-    category: food.category,
-    quantity: food.quantity,
-    unit: food.unit,
-    location:
-      food.pickupAddress ||
-      food.address ||
-      food.location ||
-      (
-        food.pickupLocation
-          ? `${food.pickupLocation.latitude}, ${food.pickupLocation.longitude}`
-          : 'Location unavailable'
-      ),
-    donor:
-      food.donor?.organizationName ||
-      food.donor?.fullName ||
-      'Unknown Donor',
-    preparedAt: formatDate(food.preparedAt),
-    deadline: formatDate(food.pickupDeadline),
-    foodType: food.foodType || 'Not specified',
-    storage: food.storage || 'Not specified',
-    allergens: food.allergens || 'Not specified',
-    description: food.description || 'No description available.',
-    distanceKm: food.distanceKm
-  });
+  id: food._id,
+  name: food.foodName,
+  category: food.category,
+  quantity: food.quantity,
+  unit: food.unit,
 
+  images: food.images || [],
+
+  location:
+    food.pickupAddress ||
+    food.address ||
+    food.location ||
+    (
+      food.pickupLocation
+        ? `${food.pickupLocation.latitude}, ${food.pickupLocation.longitude}`
+        : 'Location unavailable'
+    ),
+
+  donor:
+    food.donor?.organizationName ||
+    food.donor?.fullName ||
+    'Unknown Donor',
+
+  preparedAt: formatDate(food.preparedAt),
+  deadline: formatDate(food.pickupDeadline),
+  foodType: food.foodType || 'Not specified',
+  storage: food.storage || 'Not specified',
+  allergens: food.allergens || 'Not specified',
+  description: food.description || 'No description available.',
+  distanceKm: food.distanceKm
+});
   const filteredFoods = foods
     .map(getFoodDetails)
     .filter((food) => {
@@ -119,14 +125,15 @@ function BrowseFood() {
   // Submit food request to backend
   const handleRequest = async () => {
     if (!requestQuantity || Number(requestQuantity) <= 0) {
-      alert('Please enter a valid quantity.');
+      showToast('Please enter a valid quantity.', 'warning');
       return;
     }
 
     if (Number(requestQuantity) > selectedFood.quantity) {
-      alert(
-        `Only ${selectedFood.quantity} ${selectedFood.unit} are available.`
-      );
+      ashowToast(
+  `Only ${selectedFood.quantity} ${selectedFood.unit} are available.`,
+  'warning'
+);
       return;
     }
 
@@ -143,9 +150,10 @@ function BrowseFood() {
         selectedFood.id
       ]);
 
-      alert(
-        response.data.message || 'Food request submitted successfully!'
-      );
+      showToast(
+  response.data.message || 'Food request submitted successfully!',
+  'success'
+);
 
       setSelectedFood(null);
       setRequestQuantity('');
@@ -155,10 +163,11 @@ function BrowseFood() {
     } catch (error) {
       console.error('Food Request Error:', error);
 
-      alert(
-        error.response?.data?.message ||
-        'Unable to submit food request. Please try again.'
-      );
+      showToast(
+  error.response?.data?.message ||
+  'Unable to submit food request. Please try again.',
+  'error'
+);
     } finally {
       setSubmitting(false);
     }
@@ -245,6 +254,18 @@ function BrowseFood() {
           filteredFoods.map((food) => (
 
             <div className="ngo-food-card" key={food.id}>
+              {food.images.length > 0 ? (
+  <img
+    src={`http://localhost:5000${food.images[0]}`}
+    alt={food.name}
+    className="ngo-food-image"
+  />
+) : (
+  <div className="ngo-food-image-placeholder">
+    <Package size={40} />
+    <span>No image available</span>
+  </div>
+)}
 
               <div className="ngo-food-card-top">
                 <span className="ngo-food-category">

@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useEffect, useState } from 'react';
 import API from '../../services/api.js';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 function MyRequests() {
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -99,16 +101,17 @@ function MyRequests() {
 
       setSelectedRequest(null);
 
-      alert('Request cancelled successfully!');
+      showToast('Request cancelled successfully!', 'success');
 
       fetchMyRequests();
     } catch (error) {
       console.error('Cancel Request Error:', error);
 
-      alert(
-        error.response?.data?.message ||
-        'Unable to cancel request.'
-      );
+      showToast(
+  error.response?.data?.message ||
+  'Unable to cancel request.',
+  'error'
+);
     }
   };
     // Confirm food collection
@@ -138,15 +141,19 @@ function MyRequests() {
           : previous
       );
 
-      alert(response.data.message || 'Food collection confirmed successfully!');
+      showToast(
+  response.data.message || 'Food collection confirmed successfully!',
+  'success'
+);
 
     } catch (error) {
       console.error('Confirm Collection Error:', error);
 
-      alert(
-        error.response?.data?.message ||
-        'Unable to confirm food collection.'
-      );
+      showToast(
+  error.response?.data?.message ||
+  'Unable to confirm food collection.',
+  'error'
+);
     }
   };
 

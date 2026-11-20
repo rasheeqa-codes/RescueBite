@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import API from '../../services/api';
+
 import ManageDonors from './ManageDonors.jsx';
 import ManageNGOs from './ManageNGOs.jsx';
 import ManageDonations from './ManageDonations.jsx';
 import ManageRequests from './ManageRequests.jsx';
 import ReportsAnalytics from './ReportsAnalytics.jsx';
+
 import {
   Leaf,
   LayoutDashboard,
@@ -22,8 +25,15 @@ import {
 } from 'lucide-react';
 
 function AdminDashboard({ onLogout }) {
+
   const [activePage, setActivePage] = useState('Overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [stats, setStats] = useState(null);
+  const [activities, setActivities] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const navigation = [
     { name: 'Overview', icon: LayoutDashboard },
@@ -34,59 +44,67 @@ function AdminDashboard({ onLogout }) {
     { name: 'Reports & Analytics', icon: ChartNoAxesCombined },
   ];
 
-  const stats = [
+  // Fetch dashboard data
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await API.get('/admin/stats');
+
+      setStats(response.data.stats);
+
+      // Recent activities will be connected separately
+      setActivities([]);
+
+    } catch (err) {
+      console.error('Admin dashboard error:', err);
+
+      setError(
+        err.response?.data?.message ||
+        'Unable to load dashboard statistics.'
+      );
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Dashboard statistic cards
+  const statCards = stats ? [
     {
       title: 'Total Donors',
-      value: '48',
+      value: stats.totalDonors,
       description: 'Registered food donors',
       icon: Users,
       color: 'blue'
     },
     {
       title: 'Registered NGOs',
-      value: '32',
+      value: stats.totalNGOs,
       description: 'Partner organisations',
       icon: Building2,
       color: 'green'
     },
     {
       title: 'Total Donations',
-      value: '156',
+      value: stats.totalDonations,
       description: 'Food donations listed',
       icon: Package,
       color: 'orange'
     },
     {
       title: 'Completed Collections',
-      value: '98',
+      value: stats.completedCollections,
       description: 'Successful collections',
       icon: CheckCircle2,
       color: 'purple'
     }
-  ];
-
-  const activities = [
-    {
-      title: 'New donor registered',
-      description: 'Green Harvest Foundation joined the platform.',
-      time: '10 minutes ago'
-    },
-    {
-      title: 'New NGO registered',
-      description: 'Helping Hands NGO submitted its registration.',
-      time: '35 minutes ago'
-    },
-    {
-      title: 'Food donation added',
-      description: 'Fresh vegetable rice was listed.',
-      time: '1 hour ago'
-    },
-    {
-      title: 'Collection completed',
-      description: 'An NGO successfully collected a food donation.',
-      time: '2 hours ago'
-    }
-  ];
+  ] : [];
 
   return (
     <div className="admin-dashboard">
@@ -211,27 +229,66 @@ function AdminDashboard({ onLogout }) {
                 </div>
               </div>
 
-              <div className="admin-stats-grid">
+              {/* Statistics */}
 
-                {stats.map((stat) => {
-                  const Icon = stat.icon;
+              {loading ? (
 
-                  return (
-                    <div className="admin-stat-card" key={stat.title}>
-                      <div className={`admin-stat-icon ${stat.color}`}>
-                        <Icon size={21} />
+                <div className="admin-stats-grid">
+                  <div className="admin-stat-card">
+                    <p>Loading dashboard statistics...</p>
+                  </div>
+                </div>
+
+              ) : error ? (
+
+                <div className="admin-stat-card">
+                  <div>
+                    <p style={{ color: '#ef4444' }}>{error}</p>
+
+                    <button
+                      onClick={fetchDashboardData}
+                      style={{
+                        marginTop: '12px',
+                        padding: '8px 14px',
+                        border: 'none',
+                        borderRadius: '7px',
+                        background: '#2563eb',
+                        color: '#fff',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+
+              ) : (
+
+                <div className="admin-stats-grid">
+
+                  {statCards.map((stat) => {
+                    const Icon = stat.icon;
+
+                    return (
+                      <div className="admin-stat-card" key={stat.title}>
+                        <div className={`admin-stat-icon ${stat.color}`}>
+                          <Icon size={21} />
+                        </div>
+
+                        <div>
+                          <span>{stat.title}</span>
+                          <h2>{stat.value}</h2>
+                          <small>{stat.description}</small>
+                        </div>
                       </div>
+                    );
+                  })}
 
-                      <div>
-                        <span>{stat.title}</span>
-                        <h2>{stat.value}</h2>
-                        <small>{stat.description}</small>
-                      </div>
-                    </div>
-                  );
-                })}
+                </div>
 
-              </div>
+              )}
+
+              {/* Recent Activity */}
 
               <div className="admin-section-heading">
                 <div>
@@ -242,24 +299,41 @@ function AdminDashboard({ onLogout }) {
 
               <div className="admin-activity-list">
 
-                {activities.map((activity, index) => (
+                {activities.length > 0 ? (
 
-                  <div className="admin-activity-card" key={index}>
+                  activities.map((activity, index) => (
 
+                    <div className="admin-activity-card" key={index}>
+
+                      <div className="admin-activity-icon">
+                        <Clock size={19} />
+                      </div>
+
+                      <div className="admin-activity-info">
+                        <h3>{activity.title}</h3>
+                        <p>{activity.description}</p>
+                      </div>
+
+                      <span>{activity.time}</span>
+
+                    </div>
+
+                  ))
+
+                ) : (
+
+                  <div className="admin-activity-card">
                     <div className="admin-activity-icon">
                       <Clock size={19} />
                     </div>
 
                     <div className="admin-activity-info">
-                      <h3>{activity.title}</h3>
-                      <p>{activity.description}</p>
+                      <h3>No recent activity available</h3>
+                      <p>Platform activities will appear here.</p>
                     </div>
-
-                    <span>{activity.time}</span>
-
                   </div>
 
-                ))}
+                )}
 
               </div>
 

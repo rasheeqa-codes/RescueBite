@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import MapPicker from '../../components/MapPicker.jsx';
 import {
   MapContainer,
   TileLayer,

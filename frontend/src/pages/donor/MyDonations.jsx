@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useState, useEffect } from 'react';
 import API from '../../services/api.js';
 import {
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 
 function MyDonations({ onAddDonation }) {
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedDonation, setSelectedDonation] = useState(null);
@@ -77,12 +79,16 @@ setDonations(
       previous.filter((item) => item.id !== id)
     );
 
-    alert(response.data.message || 'Donation deleted successfully!');
+    showToast(
+  response.data.message || 'Donation deleted successfully!',
+  'success'
+);
   } catch (err) {
-    alert(
-      err.response?.data?.message ||
-      'Unable to delete donation.'
-    );
+    showToast(
+  err.response?.data?.message ||
+  'Unable to delete donation.',
+  'error'
+);
   }
 };
 

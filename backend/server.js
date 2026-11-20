@@ -8,7 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const donationRoutes = require('./routes/donationRoutes');
 const requestRoutes = require('./routes/requestRoutes');
 const locationRoutes = require('./routes/locationRoutes');
-
+const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 
 // Middleware
@@ -23,7 +23,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/locations', locationRoutes);
-
+// Admin Routes
+app.use('/api/admin', adminRoutes);
 // Test Route
 app.get('/', (req, res) => {
   res.send('Welcome to RescueBite Backend!');

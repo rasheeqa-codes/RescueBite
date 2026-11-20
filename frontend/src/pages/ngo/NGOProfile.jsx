@@ -1,4 +1,6 @@
+import { useToast } from '../../context/ToastContext.jsx';
 import { useEffect, useState } from 'react';
+import MapPicker from '../../components/MapPicker.jsx';
 import API from '../../services/api.js';
 import {
   Building2,
@@ -13,6 +15,7 @@ import {
 } from 'lucide-react';
 
 function NGOProfile({ onSave }) {
+  const { showToast } = useToast();
   const [profile, setProfile] = useState({
   organisationName: '',
   registrationNumber: '',
@@ -53,7 +56,7 @@ function NGOProfile({ onSave }) {
 
     } catch (error) {
       console.error('Error fetching NGO profile:', error);
-      alert('Unable to load organisation profile.');
+      showToast('Unable to load organisation profile.', 'error');
     }
   };
 
@@ -99,7 +102,7 @@ function NGOProfile({ onSave }) {
     setProfile(editedProfile);
     setEditMode(false);
 
-    alert('Organisation profile updated successfully!');
+    showToast('Organisation profile updated successfully!', 'success');
 
     if (onSave) {
       onSave();
@@ -108,10 +111,11 @@ function NGOProfile({ onSave }) {
   } catch (error) {
     console.error('Error updating NGO profile:', error);
 
-    alert(
-      error.response?.data?.message ||
-      'Unable to update organisation profile.'
-    );
+    showToast(
+  error.response?.data?.message ||
+  'Unable to update organisation profile.',
+  'error'
+);
   }
 };
 

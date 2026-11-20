@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useToast } from '../../context/ToastContext.jsx';
 import {
   Search,
   Filter,
   Eye,
   CheckCircle2,
-  XCircle,
   Clock,
   Building2,
   Mail,
@@ -12,119 +12,153 @@ import {
   Phone,
   X,
   ShieldCheck,
-  Ban
+  Users
 } from 'lucide-react';
 
-function ManageNGOs() {
-  const [ngos, setNgos] = useState([
-    {
-      id: 'NGO001',
-      name: 'Helping Hands Foundation',
-      email: 'helpinghands@gmail.com',
-      phone: '+91 98765 43210',
-      location: 'Coimbatore',
-      registration: 'NGO/2024/001',
-      joined: '12 Oct 2026',
-      status: 'Verified'
-    },
-    {
-      id: 'NGO002',
-      name: 'Green Earth Welfare',
-      email: 'greenearth@gmail.com',
-      phone: '+91 98765 12345',
-      location: 'Chennai',
-      registration: 'NGO/2025/014',
-      joined: '15 Oct 2026',
-      status: 'Pending'
-    },
-    {
-      id: 'NGO003',
-      name: 'Hope for Everyone',
-      email: 'hopeforeveryone@gmail.com',
-      phone: '+91 98765 67890',
-      location: 'Tiruppur',
-      registration: 'NGO/2023/028',
-      joined: '20 Oct 2026',
-      status: 'Verified'
-    },
-    {
-      id: 'NGO004',
-      name: 'Care & Share Trust',
-      email: 'careshare@gmail.com',
-      phone: '+91 98765 24680',
-      location: 'Erode',
-      registration: 'NGO/2026/006',
-      joined: '25 Oct 2026',
-      status: 'Pending'
-    },
-    {
-      id: 'NGO005',
-      name: 'Hope Foundation',
-      email: 'hopefoundation@gmail.com',
-      phone: '+91 98765 13579',
-      location: 'Salem',
-      registration: 'NGO/2024/019',
-      joined: '28 Oct 2026',
-      status: 'Rejected'
-    }
-  ]);
+import API from '../../services/api';
 
+function ManageNGOs() {
+  const { showToast } = useToast();
+  const [ngos, setNgos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedNGO, setSelectedNGO] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [verifyingId, setVerifyingId] = useState(null);
 
-  const updateStatus = (id, newStatus) => {
+  // Fetch actual NGO records from the backend
+  useEffect(() => {
+    const fetchNGOs = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const response = await API.get('/admin/ngos');
+
+        setNgos(response.data.ngos || []);
+      } catch (error) {
+        console.error('Error fetching NGOs:', error);
+
+        setError(
+          error.response?.data?.message ||
+          'Unable to load NGO information.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNGOs();
+  }, []);
+
+  // Generate an NGO ID using its MongoDB ID
+  const getNGOId = (ngo) => {
+    return `NGO-${ngo._id.slice(-6).toUpperCase()}`;
+  };
+
+  // Use the actual verification status from MongoDB
+  const getNGOStatus = (ngo) => {
+    return ngo.isVerified ? 'Verified' : 'Pending';
+  };
+  // Verify an NGO account through the backend
+const handleVerifyNGO = async (ngo) => {
+  try {
+    setVerifyingId(ngo._id);
+
+    const response = await API.patch(
+      `/admin/verify/ngo/${ngo._id}`
+    );
+
+    const updatedNGO = response.data.user;
+
+    // Update NGO list
     setNgos((previousNGOs) =>
-      previousNGOs.map((ngo) =>
-        ngo.id === id ? { ...ngo, status: newStatus } : ngo
+      previousNGOs.map((item) =>
+        item._id === updatedNGO._id ? updatedNGO : item
       )
     );
 
-    if (selectedNGO?.id === id) {
-      setSelectedNGO((previous) => ({
-        ...previous,
-        status: newStatus
-      }));
-    }
+    // Update modal if this NGO is currently selected
+    setSelectedNGO((previous) =>
+      previous?._id === updatedNGO._id ? updatedNGO : previous
+    );
+
+  } catch (error) {
+    console.error('NGO verification error:', error);
+
+    showToast(
+  error.response?.data?.message ||
+  'Unable to verify NGO. Please try again.',
+  'error'
+);
+  } finally {
+    setVerifyingId(null);
+  }
+};
+
+  // Get organisation name
+  const getNGOName = (ngo) => {
+    return ngo.organizationName || ngo.fullName || 'Unnamed Organisation';
   };
 
+  // Format registration date
+  const formatDate = (date) => {
+    if (!date) return 'Not available';
+
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Search and filter NGOs
   const filteredNGOs = ngos.filter((ngo) => {
+    const search = searchTerm.toLowerCase();
+
     const matchesSearch =
-      ngo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ngo.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ngo.id.toLowerCase().includes(searchTerm.toLowerCase());
+      getNGOName(ngo).toLowerCase().includes(search) ||
+      (ngo.fullName || '').toLowerCase().includes(search) ||
+      (ngo.email || '').toLowerCase().includes(search) ||
+      getNGOId(ngo).toLowerCase().includes(search) ||
+      (ngo.registrationNumber || '').toLowerCase().includes(search);
+
+    const status = getNGOStatus(ngo);
 
     const matchesStatus =
       statusFilter === 'All' ||
-      ngo.status === statusFilter;
+      status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
+  // Statistics based on actual database records
   const verifiedCount = ngos.filter(
-    (ngo) => ngo.status === 'Verified'
+    (ngo) => ngo.isVerified
   ).length;
 
   const pendingCount = ngos.filter(
-    (ngo) => ngo.status === 'Pending'
+    (ngo) => !ngo.isVerified
   ).length;
 
-  const rejectedCount = ngos.filter(
-    (ngo) => ngo.status === 'Rejected'
+  const registrationProvidedCount = ngos.filter(
+    (ngo) => ngo.registrationNumber?.trim()
   ).length;
 
-  const inactiveCount = ngos.filter(
-    (ngo) => ngo.status === 'Inactive'
+  const contactProvidedCount = ngos.filter(
+    (ngo) => ngo.phone?.trim()
   ).length;
 
   return (
     <div className="manage-ngos-page">
 
+      {/* Page Heading */}
       <div className="manage-ngos-heading">
         <div>
           <p className="form-eyebrow">ORGANISATION MANAGEMENT</p>
           <h1>Manage NGOs</h1>
-          <p>Review registrations and manage NGO accounts.</p>
+          <p>Review registered NGO accounts and their information.</p>
         </div>
 
         <div className="manage-ngos-heading-icon">
@@ -132,6 +166,7 @@ function ManageNGOs() {
         </div>
       </div>
 
+      {/* Statistics */}
       <div className="manage-ngos-stats">
 
         <div className="manage-ngos-stat-card">
@@ -166,30 +201,32 @@ function ManageNGOs() {
 
         <div className="manage-ngos-stat-card">
           <div className="manage-ngos-stat-icon rejected">
-            <XCircle size={21} />
+            <ShieldCheck size={21} />
           </div>
           <div>
-            <span>Rejected</span>
-            <h2>{rejectedCount}</h2>
+            <span>Registration Provided</span>
+            <h2>{registrationProvidedCount}</h2>
           </div>
         </div>
 
         <div className="manage-ngos-stat-card">
           <div className="manage-ngos-stat-icon inactive">
-            <Ban size={21} />
+            <Phone size={21} />
           </div>
           <div>
-            <span>Inactive</span>
-            <h2>{inactiveCount}</h2>
+            <span>Contact Provided</span>
+            <h2>{contactProvidedCount}</h2>
           </div>
         </div>
 
       </div>
 
+      {/* Search and Filter */}
       <div className="manage-ngos-toolbar">
 
         <div className="manage-ngos-search">
           <Search size={19} />
+
           <input
             type="text"
             placeholder="Search NGO name, email or ID..."
@@ -200,6 +237,7 @@ function ManageNGOs() {
 
         <div className="manage-ngos-filter">
           <Filter size={18} />
+
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
@@ -207,13 +245,12 @@ function ManageNGOs() {
             <option value="All">All Status</option>
             <option value="Verified">Verified</option>
             <option value="Pending">Pending</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Inactive">Inactive</option>
           </select>
         </div>
 
       </div>
 
+      {/* NGO List Heading */}
       <div className="manage-ngos-list-heading">
         <div>
           <h2>Registered Organisations</h2>
@@ -221,13 +258,27 @@ function ManageNGOs() {
         </div>
       </div>
 
+      {/* NGO List */}
       <div className="manage-ngos-list">
 
-        {filteredNGOs.length > 0 ? (
+        {loading ? (
+
+          <div className="manage-ngos-empty">
+            <p>Loading NGO information...</p>
+          </div>
+
+        ) : error ? (
+
+          <div className="manage-ngos-empty">
+            <h3>Unable to load NGOs</h3>
+            <p>{error}</p>
+          </div>
+
+        ) : filteredNGOs.length > 0 ? (
 
           filteredNGOs.map((ngo) => (
 
-            <div className="manage-ngo-card" key={ngo.id}>
+            <div className="manage-ngo-card" key={ngo._id}>
 
               <div className="manage-ngo-main">
 
@@ -236,16 +287,16 @@ function ManageNGOs() {
                 </div>
 
                 <div className="manage-ngo-info">
-                  <h3>{ngo.name}</h3>
+                  <h3>{getNGOName(ngo)}</h3>
                   <p>{ngo.email}</p>
 
                   <div className="manage-ngo-meta">
                     <span>
                       <MapPin size={14} />
-                      {ngo.location}
+                      {ngo.organizationAddress || 'Location not provided'}
                     </span>
 
-                    <span>{ngo.id}</span>
+                    <span>{getNGOId(ngo)}</span>
                   </div>
                 </div>
 
@@ -253,62 +304,34 @@ function ManageNGOs() {
 
               <div className="manage-ngo-status-area">
 
-                <span className={`manage-ngo-status ${ngo.status.toLowerCase()}`}>
-                  {ngo.status}
+                <span
+                  className={`manage-ngo-status ${getNGOStatus(ngo).toLowerCase()}`}
+                >
+                  {getNGOStatus(ngo)}
                 </span>
 
                 <div className="manage-ngo-actions">
 
-                  <button
-                    className="manage-ngo-view"
-                    onClick={() => setSelectedNGO(ngo)}
-                  >
-                    <Eye size={16} />
-                    View
-                  </button>
+  <button
+    className="manage-ngo-view"
+    onClick={() => setSelectedNGO(ngo)}
+  >
+    <Eye size={16} />
+    View
+  </button>
 
-                  {ngo.status === 'Pending' && (
-                    <>
-                      <button
-                        className="manage-ngo-approve"
-                        onClick={() => updateStatus(ngo.id, 'Verified')}
-                      >
-                        <CheckCircle2 size={16} />
-                        Approve
-                      </button>
+  {!ngo.isVerified && (
+    <button
+      className="manage-ngo-approve"
+      onClick={() => handleVerifyNGO(ngo)}
+      disabled={verifyingId === ngo._id}
+    >
+      <CheckCircle2 size={16} />
+      {verifyingId === ngo._id ? 'Verifying...' : 'Approve'}
+    </button>
+  )}
 
-                      <button
-                        className="manage-ngo-reject"
-                        onClick={() => updateStatus(ngo.id, 'Rejected')}
-                      >
-                        <XCircle size={16} />
-                        Reject
-                      </button>
-                    </>
-                  )}
-
-                  {ngo.status === 'Verified' && (
-                    <button
-                      className="manage-ngo-deactivate"
-                      onClick={() => updateStatus(ngo.id, 'Inactive')}
-                    >
-                      <Ban size={16} />
-                      Deactivate
-                    </button>
-                  )}
-
-                  {(ngo.status === 'Inactive' || ngo.status === 'Rejected') && (
-                    <button
-                      className="manage-ngo-approve"
-                      onClick={() => updateStatus(ngo.id, 'Verified')}
-                    >
-                      <ShieldCheck size={16} />
-                      Reactivate
-                    </button>
-                  )}
-
-                </div>
-
+</div>
               </div>
 
             </div>
@@ -327,6 +350,7 @@ function ManageNGOs() {
 
       </div>
 
+      {/* NGO Details Modal */}
       {selectedNGO && (
 
         <div
@@ -351,14 +375,19 @@ function ManageNGOs() {
             </div>
 
             <div className="manage-ngos-modal-profile">
+
               <div className="manage-ngo-avatar large">
                 <Building2 size={30} />
               </div>
 
-              <h3>{selectedNGO.name}</h3>
-              <span className={`manage-ngo-status ${selectedNGO.status.toLowerCase()}`}>
-                {selectedNGO.status}
+              <h3>{getNGOName(selectedNGO)}</h3>
+
+              <span
+                className={`manage-ngo-status ${getNGOStatus(selectedNGO).toLowerCase()}`}
+              >
+                {getNGOStatus(selectedNGO)}
               </span>
+
             </div>
 
             <div className="manage-ngos-details">
@@ -367,7 +396,7 @@ function ManageNGOs() {
                 <Mail size={18} />
                 <section>
                   <span>Email Address</span>
-                  <strong>{selectedNGO.email}</strong>
+                  <strong>{selectedNGO.email || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -375,15 +404,31 @@ function ManageNGOs() {
                 <Phone size={18} />
                 <section>
                   <span>Contact Number</span>
-                  <strong>{selectedNGO.phone}</strong>
+                  <strong>{selectedNGO.phone || 'Not provided'}</strong>
+                </section>
+              </div>
+
+              <div>
+                <Users size={18} />
+                <section>
+                  <span>Contact Person</span>
+                  <strong>{selectedNGO.contactPerson || selectedNGO.fullName || 'Not provided'}</strong>
                 </section>
               </div>
 
               <div>
                 <MapPin size={18} />
                 <section>
-                  <span>Location</span>
-                  <strong>{selectedNGO.location}</strong>
+                  <span>Address</span>
+                  <strong>{selectedNGO.organizationAddress || 'Not provided'}</strong>
+                </section>
+              </div>
+
+              <div>
+                <Building2 size={18} />
+                <section>
+                  <span>Organisation Name</span>
+                  <strong>{selectedNGO.organizationName || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -391,7 +436,7 @@ function ManageNGOs() {
                 <ShieldCheck size={18} />
                 <section>
                   <span>Registration Number</span>
-                  <strong>{selectedNGO.registration}</strong>
+                  <strong>{selectedNGO.registrationNumber || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -399,7 +444,7 @@ function ManageNGOs() {
                 <Clock size={18} />
                 <section>
                   <span>Joined Date</span>
-                  <strong>{selectedNGO.joined}</strong>
+                  <strong>{formatDate(selectedNGO.createdAt)}</strong>
                 </section>
               </div>
 

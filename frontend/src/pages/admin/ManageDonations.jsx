@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Search,
   Filter,
@@ -10,91 +10,96 @@ import {
   Utensils,
   Clock,
   X,
-  Trash2,
   CheckCircle2
 } from 'lucide-react';
 
+import API from '../../services/api';
+
 function ManageDonations() {
-  const [donations, setDonations] = useState([
-    {
-      id: 'DON001',
-      food: 'Vegetable Rice',
-      donor: 'Green Harvest Restaurant',
-      category: 'Cooked Food',
-      quantity: '25 servings',
-      location: 'Coimbatore',
-      date: '18 Nov 2026',
-      expiry: '18 Nov 2026',
-      status: 'Available',
-      storage: 'Refrigerated',
-      description: 'Freshly prepared vegetable rice.'
-    },
-    {
-      id: 'DON002',
-      food: 'Fresh Apples',
-      donor: 'Fresh Mart',
-      category: 'Fruits',
-      quantity: '10 kg',
-      location: 'Chennai',
-      date: '17 Nov 2026',
-      expiry: '20 Nov 2026',
-      status: 'Requested',
-      storage: 'Room Temperature',
-      description: 'Fresh apples suitable for distribution.'
-    },
-    {
-      id: 'DON003',
-      food: 'Chapati and Dal',
-      donor: 'Daily Meals Kitchen',
-      category: 'Cooked Food',
-      quantity: '40 servings',
-      location: 'Tiruppur',
-      date: '16 Nov 2026',
-      expiry: '16 Nov 2026',
-      status: 'Collected',
-      storage: 'Insulated Container',
-      description: 'Chapati with freshly prepared dal.'
-    },
-    {
-      id: 'DON004',
-      food: 'Bread Packets',
-      donor: 'Sunrise Bakery',
-      category: 'Bakery',
-      quantity: '30 packets',
-      location: 'Erode',
-      date: '14 Nov 2026',
-      expiry: '15 Nov 2026',
-      status: 'Expired',
-      storage: 'Room Temperature',
-      description: 'Packaged bread available for collection.'
-    },
-    {
-      id: 'DON005',
-      food: 'Fresh Vegetables',
-      donor: 'Organic Farm',
-      category: 'Vegetables',
-      quantity: '15 kg',
-      location: 'Salem',
-      date: '18 Nov 2026',
-      expiry: '21 Nov 2026',
-      status: 'Available',
-      storage: 'Room Temperature',
-      description: 'Freshly harvested seasonal vegetables.'
-    }
-  ]);
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [selectedDonation, setSelectedDonation] = useState(null);
 
+  // Fetch actual donations from MongoDB
+  useEffect(() => {
+    const fetchDonations = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const response = await API.get('/admin/donations');
+
+        setDonations(response.data.donations || []);
+      } catch (error) {
+        console.error('Error fetching donations:', error);
+
+        setError(
+          error.response?.data?.message ||
+          'Unable to load donation information.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDonations();
+  }, []);
+
+  // Generate donation ID
+  const getDonationId = (donation) => {
+    return donation._id
+      ? `DON-${donation._id.slice(-6).toUpperCase()}`
+      : 'Not available';
+  };
+
+  // Get donor name from populated donor information
+  const getDonorName = (donation) => {
+    return (
+      donation.donor?.organizationName ||
+      donation.donor?.fullName ||
+      'Unknown Donor'
+    );
+  };
+
+  // Format quantity
+  const getQuantity = (donation) => {
+    if (donation.quantity === undefined || donation.quantity === null) {
+      return 'Not available';
+    }
+
+    return `${donation.quantity} ${donation.unit || ''}`.trim();
+  };
+
+  // Format dates
+  const formatDate = (date) => {
+    if (!date) return 'Not available';
+
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Search and filter donations
   const filteredDonations = donations.filter((donation) => {
     const search = searchTerm.toLowerCase();
 
+    const foodName = (donation.foodName || '').toLowerCase();
+    const donorName = getDonorName(donation).toLowerCase();
+    const donorEmail = (donation.donor?.email || '').toLowerCase();
+    const donationId = getDonationId(donation).toLowerCase();
+
     const matchesSearch =
-      donation.food.toLowerCase().includes(search) ||
-      donation.donor.toLowerCase().includes(search) ||
-      donation.id.toLowerCase().includes(search);
+      foodName.includes(search) ||
+      donorName.includes(search) ||
+      donorEmail.includes(search) ||
+      donationId.includes(search);
 
     const matchesStatus =
       statusFilter === 'All' ||
@@ -107,36 +112,15 @@ function ManageDonations() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const updateStatus = (id, newStatus) => {
-    setDonations((previous) =>
-      previous.map((donation) =>
-        donation.id === id
-          ? { ...donation, status: newStatus }
-          : donation
-      )
-    );
-
-    setSelectedDonation((previous) =>
-      previous?.id === id
-        ? { ...previous, status: newStatus }
-        : previous
-    );
-  };
-
-  const removeDonation = (id) => {
-    setDonations((previous) =>
-      previous.filter((donation) => donation.id !== id)
-    );
-
-    setSelectedDonation(null);
-  };
-
+  // Statistics from actual database records
   const availableCount = donations.filter(
     (item) => item.status === 'Available'
   ).length;
 
   const requestedCount = donations.filter(
-    (item) => item.status === 'Requested'
+    (item) =>
+      item.status === 'Requested' ||
+      item.status === 'Partially Requested'
   ).length;
 
   const collectedCount = donations.filter(
@@ -150,11 +134,12 @@ function ManageDonations() {
   return (
     <div className="manage-donations-page">
 
+      {/* Page Heading */}
       <div className="manage-donations-heading">
         <div>
           <p className="form-eyebrow">FOOD MANAGEMENT</p>
           <h1>Manage Donations</h1>
-          <p>Monitor and manage all food donation listings.</p>
+          <p>Monitor all registered food donation listings.</p>
         </div>
 
         <div className="manage-donations-heading-icon">
@@ -162,6 +147,7 @@ function ManageDonations() {
         </div>
       </div>
 
+      {/* Statistics */}
       <div className="manage-donations-stats">
 
         <div className="manage-donation-stat">
@@ -216,6 +202,7 @@ function ManageDonations() {
 
       </div>
 
+      {/* Search and Filters */}
       <div className="manage-donations-toolbar">
 
         <div className="manage-donations-search">
@@ -238,6 +225,7 @@ function ManageDonations() {
           >
             <option value="All">All Status</option>
             <option value="Available">Available</option>
+            <option value="Partially Requested">Partially Requested</option>
             <option value="Requested">Requested</option>
             <option value="Collected">Collected</option>
             <option value="Expired">Expired</option>
@@ -261,6 +249,7 @@ function ManageDonations() {
 
       </div>
 
+      {/* Donation List Heading */}
       <div className="manage-donations-list-heading">
         <div>
           <h2>Food Donation Listings</h2>
@@ -268,13 +257,27 @@ function ManageDonations() {
         </div>
       </div>
 
+      {/* Donation List */}
       <div className="manage-donations-list">
 
-        {filteredDonations.length > 0 ? (
+        {loading ? (
+
+          <div className="manage-donations-empty">
+            <p>Loading donation information...</p>
+          </div>
+
+        ) : error ? (
+
+          <div className="manage-donations-empty">
+            <h3>Unable to load donations</h3>
+            <p>{error}</p>
+          </div>
+
+        ) : filteredDonations.length > 0 ? (
 
           filteredDonations.map((donation) => (
 
-            <div className="manage-donation-card" key={donation.id}>
+            <div className="manage-donation-card" key={donation._id}>
 
               <div className="manage-donation-main">
 
@@ -283,16 +286,18 @@ function ManageDonations() {
                 </div>
 
                 <div className="manage-donation-info">
-                  <h3>{donation.food}</h3>
-                  <p>{donation.donor}</p>
+                  <h3>{donation.foodName || 'Unnamed Food Donation'}</h3>
+                  <p>{getDonorName(donation)}</p>
 
                   <div className="manage-donation-meta">
-                    <span>{donation.id}</span>
+                    <span>{getDonationId(donation)}</span>
+
                     <span>
                       <MapPin size={13} />
-                      {donation.location}
+                      {donation.address || 'Location not provided'}
                     </span>
-                    <span>{donation.quantity}</span>
+
+                    <span>{getQuantity(donation)}</span>
                   </div>
                 </div>
 
@@ -300,7 +305,9 @@ function ManageDonations() {
 
               <div className="manage-donation-status-area">
 
-                <span className={`manage-donation-status ${donation.status.toLowerCase()}`}>
+                <span
+                  className={`manage-donation-status ${(donation.status || '').toLowerCase().replace(/\s+/g, '-')}`}
+                >
                   {donation.status}
                 </span>
 
@@ -313,17 +320,6 @@ function ManageDonations() {
                     <Eye size={16} />
                     View
                   </button>
-
-                  {donation.status !== 'Collected' &&
-                    donation.status !== 'Expired' && (
-                      <button
-                        className="manage-donation-remove"
-                        onClick={() => removeDonation(donation.id)}
-                      >
-                        <Trash2 size={16} />
-                        Remove
-                      </button>
-                    )}
 
                 </div>
 
@@ -345,6 +341,7 @@ function ManageDonations() {
 
       </div>
 
+      {/* Donation Details Modal */}
       {selectedDonation && (
 
         <div
@@ -369,15 +366,19 @@ function ManageDonations() {
             </div>
 
             <div className="manage-donations-modal-profile">
+
               <div className="manage-donation-avatar large">
                 <Utensils size={30} />
               </div>
 
-              <h3>{selectedDonation.food}</h3>
+              <h3>{selectedDonation.foodName || 'Unnamed Food Donation'}</h3>
 
-              <span className={`manage-donation-status ${selectedDonation.status.toLowerCase()}`}>
+              <span
+                className={`manage-donation-status ${(selectedDonation.status || '').toLowerCase().replace(/\s+/g, '-')}`}
+              >
                 {selectedDonation.status}
               </span>
+
             </div>
 
             <div className="manage-donations-details">
@@ -386,7 +387,7 @@ function ManageDonations() {
                 <Package size={18} />
                 <section>
                   <span>Donation ID</span>
-                  <strong>{selectedDonation.id}</strong>
+                  <strong>{getDonationId(selectedDonation)}</strong>
                 </section>
               </div>
 
@@ -394,7 +395,7 @@ function ManageDonations() {
                 <Building2 size={18} />
                 <section>
                   <span>Donor</span>
-                  <strong>{selectedDonation.donor}</strong>
+                  <strong>{getDonorName(selectedDonation)}</strong>
                 </section>
               </div>
 
@@ -402,7 +403,7 @@ function ManageDonations() {
                 <Utensils size={18} />
                 <section>
                   <span>Category</span>
-                  <strong>{selectedDonation.category}</strong>
+                  <strong>{selectedDonation.category || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -410,7 +411,7 @@ function ManageDonations() {
                 <Package size={18} />
                 <section>
                   <span>Quantity</span>
-                  <strong>{selectedDonation.quantity}</strong>
+                  <strong>{getQuantity(selectedDonation)}</strong>
                 </section>
               </div>
 
@@ -418,7 +419,7 @@ function ManageDonations() {
                 <MapPin size={18} />
                 <section>
                   <span>Location</span>
-                  <strong>{selectedDonation.location}</strong>
+                  <strong>{selectedDonation.address || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -426,7 +427,7 @@ function ManageDonations() {
                 <CalendarDays size={18} />
                 <section>
                   <span>Listed Date</span>
-                  <strong>{selectedDonation.date}</strong>
+                  <strong>{formatDate(selectedDonation.createdAt)}</strong>
                 </section>
               </div>
 
@@ -434,7 +435,7 @@ function ManageDonations() {
                 <Clock size={18} />
                 <section>
                   <span>Pickup Deadline</span>
-                  <strong>{selectedDonation.expiry}</strong>
+                  <strong>{formatDate(selectedDonation.pickupDeadline)}</strong>
                 </section>
               </div>
 
@@ -442,7 +443,7 @@ function ManageDonations() {
                 <Package size={18} />
                 <section>
                   <span>Storage</span>
-                  <strong>{selectedDonation.storage}</strong>
+                  <strong>{selectedDonation.storage || 'Not provided'}</strong>
                 </section>
               </div>
 
@@ -450,7 +451,7 @@ function ManageDonations() {
                 <Utensils size={18} />
                 <section>
                   <span>Description</span>
-                  <strong>{selectedDonation.description}</strong>
+                  <strong>{selectedDonation.notes || 'No description provided'}</strong>
                 </section>
               </div>
 
